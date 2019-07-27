@@ -2,7 +2,7 @@
 
 ID3D11Device *g_pdevice = nullptr;
 ID3D11DeviceContext *g_pcontext = nullptr;
- ID3D11RenderTargetView *g_prender_target_view = nullptr;
+ID3D11RenderTargetView *g_prender_target_view = nullptr;
 
 std::once_flag present;
 bool b_showmenu = true;
