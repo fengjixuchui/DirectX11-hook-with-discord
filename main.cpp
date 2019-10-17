@@ -2,6 +2,7 @@
 
 ID3D11Device *g_pdevice = nullptr;
 ID3D11DeviceContext *g_pcontext = nullptr;
+ID3D11RenderTargetView *g_prender_target_view = nullptr;
 
 std::once_flag present;
 bool b_showmenu = true;
@@ -14,39 +15,53 @@ uintptr_t curtime = 0;
 #define windowclass 0 //game class, unused in most situations
 
 long __stdcall hk_present(IDXGISwapChain* p_swapchain, unsigned int syncintreval, unsigned int flags) {
+    
+    std::call_once(present, [&] {
+        p_swapchain->GetDevice(__uuidof(g_pdevice), reinterpret_cast<void**>(&g_pdevice));
+        g_pdevice->GetImmediateContext(&g_pcontext);
+        ID3D11Texture2D *pBackBuffer;
+        p_swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&pBackBuffer);
 
-	std::call_once(present, [&] {
-		p_swapchain->GetDevice(__uuidof(g_pdevice), reinterpret_cast<void**>(&g_pdevice));
-		g_pdevice->GetImmediateContext(&g_pcontext);
-		ID3D11Texture2D *pBackBuffer;
-		p_swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&pBackBuffer);
+    
 
-		ID3D11RenderTargetView *pRTV;
-		g_pdevice->CreateRenderTargetView(pBackBuffer, NULL, &pRTV);
+        D3D11_TEXTURE2D_DESC bd;
+        pBackBuffer->GetDesc(&bd);
+        pBackBuffer->Release();
+        w = static_cast<int>(bd.Width);
+        h = static_cast<int>(bd.Height);
 
-		D3D11_TEXTURE2D_DESC bd;
-		pBackBuffer->GetDesc(&bd);
-		pBackBuffer->Release();
-		w = static_cast<int>(bd.Width);
-		h = static_cast<int>(bd.Height);
-		ImGui_ImplDX11_Init(iat(FindWindowA).get()(windowclass, xorstr_(windowname)), g_pdevice, g_pcontext);
-	});
+        ID3D11Texture2D* render_texture = nullptr;
 
-	if (o_getasynckeystate(VK_INSERT) && (iat(GetTickCount64).get()() - curtime) > 1500) {//wndproc for loosers, big coders(not me, so i added only 1 button) create their own handler
-		b_showmenu = !b_showmenu;
-		curtime = iat(GetTickCount64).get()();
-	}
+        if (SUCCEEDED(p_swapchain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)(&render_texture)))) {
+            D3D11_RENDER_TARGET_VIEW_DESC desc = {};
+            memset(&desc, 0, sizeof(desc));
+            desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+
+            g_pdevice->CreateRenderTargetView(render_texture, &desc, &g_prender_target_view);
+            render_texture->Release();
+        }
+
+        ImGui_ImplDX11_Init(iat(FindWindowA).get()(windowclass, xorstr_(windowname)), g_pdevice, g_pcontext);
+    });
+
+    g_pcontext->OMSetRenderTargets(1, &g_prender_target_view, nullptr);
+
+    if (o_getasynckeystate(VK_INSERT) && (iat(GetTickCount64).get()() - curtime) > 1500) {//wndproc for loosers, big coders(not me, so i added only 1 button) create their own handler
+        b_showmenu = !b_showmenu;
+        curtime = iat(GetTickCount64).get()();
+    }
 
 
-	if (b_showmenu) {
-		ImGui_ImplDX11_NewFrame();
-		if (ImGui::Begin(xorstr_("easy hook thru discord"), 0, ImVec2(800, 400))) {
-
-			ImGui::End();
-		}
-		ImGui::Render();
-	}
-	return o_present(p_swapchain, syncintreval, flags);
+    if (b_showmenu) {
+        ImGui::SetNextWindowPosCenter();
+        ImGui_ImplDX11_NewFrame();
+        if (ImGui::Begin(xorstr_("easy hook thru discord"), 0, ImVec2(800, 400))) {
+            ImGui::End();
+        }
+        ImGui::Render();
+    }
+    return o_present(p_swapchain, syncintreval, flags);
 }
 
 
